@@ -1,110 +1,147 @@
-local Key, AuthF, HopF, StatsF = "2011", "Auth.json", "Hops.json", "Stats.json"
-local HS, TS, LP = game:GetService("HttpService"), game:GetService("TeleportService"), game.Players.LocalPlayer
-local RS = game:GetService("RunService")
+-- [[ BODIK V89: PRIVATE OWNER-LOCK FIXED ]] --
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
 
-local function save(f, d) pcall(function() writefile(f, HS:JSONEncode(d)) end) end
-local function load(f) 
-    local s, r = pcall(function() return HS:JSONDecode(readfile(f)) end)
-    return s and r or {} 
+-- ILISI KINI SA IMONG TINUOD NGA ROBLOX ID --
+local OWNER_ID = 10473581212 -- Gibutang nako ang ID gikan sa imong Script.txt 
+
+-- Check kung ang naggamit mao ba ang tag-iya
+if LocalPlayer.UserId ~= OWNER_ID then 
+    LocalPlayer:Kick("ERROR: This script can't be used anymore the things inside it are broken!")
+    return 
 end
 
-local auth, visited, stats = load(AuthF), load(HopF), load(StatsF)
-stats.TotalClaims = stats.TotalClaims or 0
+-- [[ PADAYON ANG SCRIPT KUNG IKAW ANG TAG-IYA ]] --
+print("Welcome, Owner!")
 
--- UI Neon Design
-local sg = Instance.new("ScreenGui", game.CoreGui)
-local mainFrame = Instance.new("Frame", sg)
-mainFrame.Size, mainFrame.Position = UDim2.new(0, 350, 0, 60), UDim2.new(0.5, -175, 0, 30)
-mainFrame.BackgroundColor3, mainFrame.BackgroundTransparency = Color3.fromRGB(5, 5, 5), 0.1
-Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 10)
-local uiStroke = Instance.new("UIStroke", mainFrame)
-uiStroke.Thickness, uiStroke.Color = 3, Color3.fromRGB(0, 255, 255)
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
+local STATS_FILE = "BodikStats.txt"
+local BLACKLIST_FILE = "BodikBlacklist.json"
 
-local statusLabel = Instance.new("TextLabel", mainFrame)
-statusLabel.Size, statusLabel.BackgroundTransparency = UDim2.new(1, 0, 1, 0), 1
-statusLabel.TextColor3, statusLabel.Font, statusLabel.TextSize = Color3.new(1, 1, 1), Enum.Font.GothamBold, 18
-statusLabel.Text = "TURBO ACTIVATED..."
+local function GET_BLACKLIST() 
+    if isfile and isfile(BLACKLIST_FILE) then 
+        local s, d = pcall(function() return HttpService:JSONDecode(readfile(BLACKLIST_FILE)) end) 
+        return s and d or {} 
+    end
+    return {} 
+end
 
-task.spawn(function() while task.wait() do uiStroke.Color = Color3.fromHSV(tick() % 3 / 3, 1, 1) end end)
+local function SAVE_BLACKLIST(id) 
+    local v = GET_BLACKLIST()
+    v[id] = os.time()
+    if writefile then writefile(BLACKLIST_FILE, HttpService:JSONEncode(v)) end 
+end
 
-local function start()
-    if not game:IsLoaded() then game.Loaded:Wait() end
-    local char = LP.Character or LP.CharacterAdded:Wait()
-    local hrp = char:WaitForChild("HumanoidRootPart")
+local function GET_STATS() 
+    if isfile and isfile(STATS_FILE) then return tonumber(readfile(STATS_FILE)) or 0 end
+    return 0 
+end
+
+local function SAVE_STATS(v) 
+    if writefile then pcall(function() writefile(STATS_FILE, tostring(v)) end) end 
+end
+
+local total_claimed = GET_STATS()
+
+function START_FARM()
+    if LocalPlayer.PlayerGui:FindFirstChild("BodikGui") then LocalPlayer.PlayerGui.BodikGui:Destroy() end
     
-    -- Nameless Stealth
-    char:WaitForChild("Humanoid").DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
-    for _, p in pairs(char:GetDescendants()) do 
-        if p:IsA("BasePart") then p.Transparency = 1 
-        elseif p:IsA("Decal") or p:IsA("Accessory") then p:Destroy() end 
-    end
-
-    workspace.CurrentCamera.CameraType = Enum.CameraType.Scriptable
-    RS.Heartbeat:Connect(function()
-        if hrp then workspace.CurrentCamera.CFrame = CFrame.new(hrp.Position + Vector3.new(0,12,0), hrp.Position) end
-    end)
+    local sg = Instance.new("ScreenGui", LocalPlayer.PlayerGui)
+    sg.Name = "BodikGui"
     
-    visited[game.JobId] = true; save(HopF, visited)
-    local unclaim = nil
-    for _, r in pairs(game:GetDescendants()) do 
-        if r:IsA("RemoteEvent") and (r.Name:lower():find("unclaim") or r.Name:lower():find("leave")) then unclaim = r break end 
+    local label = Instance.new("TextLabel", sg)
+    label.Size = UDim2.new(0, 250, 0, 70)
+    label.Position = UDim2.new(0.5, -125, 0, 50)
+    label.BackgroundColor3 = Color3.new(0, 0, 0)
+    label.BackgroundTransparency = 0.5
+    label.TextColor3 = Color3.new(0, 1, 1)
+    label.TextSize = 14
+    label.Font = Enum.Font.Code
+    
+    local function update_gui(status_text) 
+        label.Text = "[BODIK V89 PRIVATE]\nSTATUS: " .. status_text .. "\nCLAIMED: " .. total_claimed 
     end
-
-    local function doHop()
-        statusLabel.Text = "FAST HOPPING..."
-        save(StatsF, stats)
-        local success, result = pcall(function()
-            return HS:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/"..game.PlaceId.."/servers/Public?sortOrder=Desc&limit=100")).data
-        end)
-        
-        if success and result then
-            for _, v in pairs(result) do 
-                if v.id ~= game.JobId and not visited[v.id] and v.playing < v.maxPlayers then 
-                    TS:TeleportToPlaceInstance(game.PlaceId, v.id) 
-                    return 
-                end 
-            end
-        end
-        visited = {}; save(HopF, visited); TS:Teleport(game.PlaceId) -- Unlimited
-    end
-
-    task.spawn(function()
-        local bl, lastClaim, session = {}, tick(), 0
-        while true do
-            local found = false
-            for _, v in pairs(workspace:GetDescendants()) do
-                if v:IsA("ProximityPrompt") and v.ActionText:find("Claim") and not bl[v.Parent] then
-                    found, bl[v.Parent] = true, true
-                    
-                    -- AGGRESSIVE SPEED: Reduced Delays
-                    hrp.CFrame = v.Parent.CFrame
-                    task.wait(0.04) 
-                    session = session + 1
-                    statusLabel.Text = "TURBO CLAIM: " .. session
-                    fireproximityprompt(v)
-                    
-                    if unclaim then task.spawn(function() unclaim:FireServer() end) end
-                    task.wait(0.04)
-                    lastClaim = tick()
-                end
-            end
-            -- Faster Anti-Stuck
-            if not found or (tick() - lastClaim > 4) then doHop() break end 
+    
+    repeat task.wait() until LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    local hrp = LocalPlayer.Character.HumanoidRootPart
+    local cam = workspace.CurrentCamera
+ 
+    -- AUTO-GHOST & AUTO-UNEQUIP [cite: 8, 9, 10]
+    local function stealth_mode()
+        local tool = LocalPlayer.Backpack:FindFirstChildWhichIsA("Tool") or LocalPlayer.Character:FindFirstChildWhichIsA("Tool")
+        if tool then 
+            LocalPlayer.Character.Humanoid:EquipTool(tool)
             task.wait(0.2)
+            tool:Activate()
+            task.wait(0.2)
+            LocalPlayer.Character.Humanoid:UnequipTools()
+            update_gui("STEALTH ACTIVE")
         end
+    end
+    
+    stealth_mode()
+ 
+    LocalPlayer.CameraMode = Enum.CameraMode.LockFirstPerson
+    LocalPlayer.CameraMaxZoomDistance = 0.5
+    update_gui("FARMING...")
+    
+    local targets = {}
+    for _, p in pairs(workspace:GetDescendants()) do 
+        if p:IsA("ProximityPrompt") then
+            local aT, oT, pN = p.ActionText:lower(), p.ObjectText:lower(), p.Parent.Name:lower()
+            local isShop = aT:find("buy") or aT:find("purchase") or aT:find("coin") or pN:find("shop") or oT:find("coin")
+            if (aT:find("claim") or oT:find("booth")) and not isShop then 
+                table.insert(targets, p) 
+            end 
+        end
+    end
+ 
+    if #targets > 0 then
+        for i, prompt in pairs(targets) do
+            update_gui("PRIVATE CLAIM " .. i .. "/" .. #targets)
+            local parent = prompt.Parent:IsA("BasePart") and prompt.Parent or prompt.Parent:FindFirstChildWhichIsA("BasePart")
+            if not parent then continue end
+            
+            cam.CameraType = Enum.CameraType.Scriptable
+            hrp.CFrame = CFrame.new(parent.Position + Vector3.new(0, 1.2, 0))
+            cam.CFrame = CFrame.new(hrp.Position + Vector3.new(0, 0.5, 0)) * CFrame.Angles(math.rad(-90), 0, 0)
+            
+            task.wait(0.3)
+            prompt.HoldDuration = 0
+            prompt.RequiresLineOfSight = false
+            fireproximityprompt(prompt)
+            
+            local event = ReplicatedStorage:FindFirstChild("Events") and (ReplicatedStorage.Events:FindFirstChild("UnclaimBooth") or ReplicatedStorage.Events:FindFirstChild("Unclaim"))
+            if event then event:FireServer() end
+            
+            total_claimed = total_claimed + 1
+            SAVE_STATS(total_claimed)
+            task.wait(0.1)
+        end
+    end
+ 
+    update_gui("SERVER HOP...")
+    SAVE_BLACKLIST(game.JobId)
+    
+    local blacklist = GET_BLACKLIST()
+    local ok, res = pcall(function() 
+        return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Desc&limit=100")) 
     end)
+    
+    if ok and res.data then 
+        for _, sv in pairs(res.data) do 
+            if sv.id ~= game.JobId and sv.playing < sv.maxPlayers and not blacklist[sv.id] then 
+                TeleportService:TeleportToPlaceInstance(game.PlaceId, sv.id, LocalPlayer)
+                return
+            end
+        end 
+    end
+    
+    if writefile then writefile(BLACKLIST_FILE, "{}") end
+    task.wait(1)
+    START_FARM()
 end
 
--- PASSWORD GATE (2011)
-if auth.ID == LP.UserId then start() else
-    local kg = Instance.new("ScreenGui", game.CoreGui); local kf = Instance.new("Frame", kg)
-    kf.Size, kf.Position, kf.BackgroundColor3 = UDim2.new(0,250,0,120), UDim2.new(0.5,-125,0.5,-60), Color3.fromRGB(20,20,20)
-    Instance.new("UICorner", kf).CornerRadius = UDim.new(0,8)
-    local ti = Instance.new("TextBox", kf); ti.Size, ti.Position, ti.PlaceholderText = UDim2.new(0.8,0,0,35), UDim2.new(0.1,0,0.2,0), "Password?"
-    ti.Text = ""; ti.BackgroundColor3 = Color3.fromRGB(40,40,40); ti.TextColor3 = Color3.new(1,1,1)
-    local tb = Instance.new("TextButton", kf); tb.Size, tb.Position, tb.Text = UDim2.new(0.8,0,0,35), UDim2.new(0.1,0,0.6,0), "LOGIN"
-    tb.BackgroundColor3 = Color3.fromRGB(0, 150, 255); tb.TextColor3 = Color3.new(1,1,1)
-    tb.MouseButton1Click:Connect(function()
-        if ti.Text == Key then auth.ID = LP.UserId; save(AuthF, auth); kg:Destroy(); start() else LP:Kick("SAYOP!") end
-    end)
-end
+START_FARM()
