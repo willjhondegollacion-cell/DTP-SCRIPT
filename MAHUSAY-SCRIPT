@@ -3,7 +3,7 @@ local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
 -- ILISI KINI SA IMONG TINUOD NGA ROBLOX ID --
-local OWNER_ID = 10479954881 -- Gibutang nako ang ID gikan sa imong Script.txt 
+local OWNER_ID = 10485142153 -- Gibutang nako ang ID gikan sa imong Script.txt 
 
 -- Check kung ang naggamit mao ba ang tag-iya
 if LocalPlayer.UserId ~= OWNER_ID then 
